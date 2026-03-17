@@ -348,20 +348,26 @@ def export_gpx(session_id):
 
 
 if __name__ == '__main__':
+    _browser_opened = False
+    
     def open_browser():
         """Apri il browser dopo che il server è avviato"""
+        global _browser_opened
+        if _browser_opened:
+            return
+        _browser_opened = True
         time.sleep(2)
         try:
             webbrowser.open("http://localhost:5000")
             print("✓ Browser aperto")
-        except Exception as e:
-            print(f"⚠ Non è possibile aprire il browser: {e}")
+        except Exception:
+            pass
     
     print("🚀 Avvio web app...")
-    print("📍 Server sarà disponibile su: http://localhost:5000")
-    print("⏹ Premi Ctrl+C per arresto server\n")
+    print("📍 Server: http://localhost:5000")
+    print("⏹ Premi Ctrl+C per arresto\n")
     
     browser_thread = threading.Thread(target=open_browser, daemon=True)
     browser_thread.start()
     
-    app.run(debug=True, host='localhost', port=5000)
+    app.run(host='localhost', port=5000, use_reloader=False)
