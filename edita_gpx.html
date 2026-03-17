@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor GPX - WebApp</title>
+    
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- D3 per altimetria -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Leaflet Elevation -->
+    <link rel="stylesheet" href="https://unpkg.com/@raruto/leaflet-elevation@2.2.5/dist/leaflet-elevation.css" />
+    <script src="https://unpkg.com/@raruto/leaflet-elevation@2.2.5/dist/leaflet-elevation.js"></script>
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8f9fa;
+            color: #1a1a1a;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        header {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #fc5200;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 0.95rem;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            background: #f9fafb;
+        }
+        
+        .panel-body {
+            padding: 1rem;
+        }
+        
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .upload-zone:hover {
+            border-color: #fc5200;
+            background: #fff7ed;
+        }
+        
+        .upload-zone.active {
+            border-color: #06b6d4;
+            background: #ecf9ff;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        /* Controls */
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .control-label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        
+        .control-description {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.3rem;
+        }
+
+        .section-tools {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        .section-tools .button-group {
+            margin-top: 0.5rem;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #d1d5db;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fc5200;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #ff6b35;
+            box-shadow: 0 0 8px rgba(252, 82, 0, 0.3);
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fc5200;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        
+        input[type="range"]::-moz-range-thumb:hover {
+            background: #ff6b35;
+            box-shadow: 0 0 8px rgba(252, 82, 0, 0.3);
+        }
+        
+        .range-value {
+            display: inline-block;
+            background: #fc5200;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        /* Legenda gradient pendenza */
+        .gradient-legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.8rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 2px;
+            border: 1px solid #d1d5db;
+        }
+        
+        /* Data fields */
+        .data-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .data-field {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .data-field label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+            color: #333;
+        }
+        
+        .data-field input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+        
+        .data-field input:focus {
+            outline: none;
+            border-color: #fc5200;
+            box-shadow: 0 0 0 3px rgba(252, 82, 0, 0.1);
+        }
+        
+        /* Maps */
+        #map {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        #elevation {
+            position: relative;
+            width: 100%;
+            min-height: 280px;
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+
+        #elevation svg {
+            width: 100%;
+            height: 280px;
+            display: block;
+        }
+        
+        .leaflet-elevation-control-toggle {
+            display: none !important;
+        }
+        
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fc5200;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        
+        .btn-primary {
+            background: #fc5200;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #ff6b35;
+        }
+        
+        .btn-secondary {
+            background: #06b6d4;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #0891b2;
+        }
+
+        .btn-tertiary {
+            background: #111827;
+            color: white;
+        }
+
+        .btn-tertiary:hover {
+            background: #1f2937;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Messages */
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .message.show {
+            display: block;
+        }
+        
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        
+        .message.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .message.info {
+            background: #ecf9ff;
+            color: #0c4a6e;
+            border: 1px solid #bae6fd;
+        }
+        
+        /* Status */
+        .status {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 0.5rem;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f4f6;
+            border-top-color: #fc5200;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            #map {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📍 Editor GPX</h1>
+            <p class="subtitle">Carica un GPX, regola il smoothing, visualizza mappa e altimetria in real-time</p>
+        </header>
+        
+        <div id="message" class="message"></div>
+        
+        <div class="main-grid">
+            <!-- Left panel: Upload & Controls -->
+            <div>
+                <div class="panel">
+                    <div class="panel-header">📤 Carica GPX</div>
+                    <div class="panel-body">
+                        <div class="upload-zone" id="uploadZone">
+                            <div>📁 Trascina qui il file GPX oppure clicca per selezionare</div>
+                            <input type="file" id="fileInput" accept=".gpx">
+                            <div class="status" id="uploadStatus"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel" style="margin-top: 1rem; display: none;" id="controlsPanel">
+                    <div class="panel-header">⚙️ Impostazioni</div>
+                    <div class="panel-body">
+                        <div class="control-group">
+                            <label class="control-label">
+                                Livello di smoothing: <span class="range-value" id="smoothValue">0</span>
+                            </label>
+                            <input type="range" id="smoothSlider" min="0" max="15" value="0">
+                            <div class="control-description">0 = GPX originale, aumenta per ridurre rumore GPS</div>
+
+                            <div class="section-tools">
+                                <div class="control-label" style="margin-bottom: 0.25rem;">Smoothing sezione corrente</div>
+                                <div class="control-description" id="sectionInfo">Seleziona una sezione con drag sull'altimetria</div>
+                                <div class="button-group">
+                                    <button class="btn-tertiary" id="smoothSectionBtn" type="button">Applica alla sezione</button>
+                                    <button class="btn-secondary" id="resetZoomBtn" type="button">Reset zoom altimetria</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e5e7eb;">
+                        
+                        <div class="control-group">
+                            <label class="control-label">Modifica manuale</label>
+                            <div class="data-row">
+                                <div class="data-field">
+                                    <label>Distanza (km)</label>
+                                    <input type="number" id="distanzaEdit" step="0.1" min="0">
+                                </div>
+                                <div class="data-field">
+                                    <label>Dislivello (m)</label>
+                                    <input type="number" id="dislivelloEdit" step="1" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button class="btn-primary" id="exportBtn">💾 Esporta GPX</button>
+                            <button class="btn-secondary" id="copyBtn">📋 Copia</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right panel: Map & Elevation -->
+            <div>
+                <div class="panel">
+                    <div class="panel-header">🗺️ Planimetria</div>
+                    <div class="panel-body">
+                        <div id="map"></div>
+                        <div class="gradient-legend" id="legendContainer"></div>
+                    </div>
+                </div>
+                
+                <div class="panel" style="margin-top: 1rem;">
+                    <div class="panel-header">📈 Altimetria</div>
+                    <div class="panel-body">
+                        <div id="elevation"></div>
+                        <div class="gradient-legend" style="margin-top: 0.5rem;">
+                            <div id="selection-stats" style="display:flex;gap:1.2rem;align-items:center;width:100%;font-size:0.85rem;flex-wrap:wrap;">
+                                <span style="color:#6b7280;font-size:0.8rem;" id="sel-label">Trascina sul grafico per selezionare una sezione</span>
+                                <span id="sel-dist" style="display:none">📏 <strong id="sel-dist-val">--</strong></span>
+                                <span id="sel-gain" style="display:none">↑ <strong id="sel-gain-val" style="color:#16a34a">--</strong></span>
+                                <span id="sel-loss" style="display:none">↓ <strong id="sel-loss-val" style="color:#2563eb">--</strong></span>
+                                <span id="sel-grade" style="display:none">⛰ <strong id="sel-grade-val">--</strong> media</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="statKm">—</div>
+                        <div class="stat-label">km</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="statElev">—</div>
+                        <div class="stat-label">m D+</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="statPoints">—</div>
+                        <div class="stat-label">punti</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ── STATO GLOBALE ────────────────────────────────────────────────────────
+        let currentSessionId = null;
+        let currentGpxPoints = null;
+        let baseGpxPoints = null;
+        let map = null;
+        let routeLayerGroup = null;
+        let hasInitialFit = false;
+        let currentZoomDomain = null;
+        let currentRouteData = null;
+        let hoverMapMarker = null;
+        let zoomStartMarker = null;
+        let zoomEndMarker = null;
+        
+        // ── UTILITY ──────────────────────────────────────────────────────────────
+        
+        function showMessage(text, type = 'info') {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message show ${type}`;
+            setTimeout(() => msg.classList.remove('show'), 5000);
+        }
+
+        function updateSectionInfo() {
+            const info = document.getElementById('sectionInfo');
+            if (!info) return;
+            if (!currentZoomDomain) {
+                info.textContent = "Seleziona una sezione con drag sull'altimetria";
+                return;
+            }
+            info.textContent = `Sezione: km ${currentZoomDomain[0].toFixed(2)} - ${currentZoomDomain[1].toFixed(2)}`;
+        }
+
+        function clonePoints(points) {
+            return (points || []).map((p) => ({ ...p }));
+        }
+
+        function smoothElevations(points, windowSize) {
+            const w = Math.max(0, parseInt(windowSize, 10) || 0);
+            const src = (points || []).map((p) => p.ele || 0);
+            if (w <= 1) return src.slice();
+
+            const dst = src.slice();
+            const half = Math.floor(w / 2);
+            for (let i = 0; i < src.length; i++) {
+                const start = Math.max(0, i - half);
+                const end = Math.min(src.length - 1, i + half);
+                let sum = 0;
+                let count = 0;
+                for (let j = start; j <= end; j++) {
+                    sum += src[j];
+                    count += 1;
+                }
+                dst[i] = sum / count;
+            }
+            return dst;
+        }
+
+        function applyGlobalSmoothingFromBase(windowSize) {
+            if (!baseGpxPoints) return;
+            const smoothed = smoothElevations(baseGpxPoints, windowSize);
+            currentGpxPoints = baseGpxPoints.map((p, i) => ({
+                ...p,
+                ele: Math.round(smoothed[i] * 10) / 10,
+            }));
+        }
+        
+        function initMap() {
+            if (!map) {
+                map = L.map('map').setView([42, 12], 8);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap',
+                    maxZoom: 19
+                }).addTo(map);
+            }
+        }
+        
+        function computeRouteData(gpxPoints) {
+            if (!gpxPoints || gpxPoints.length === 0) return null;
+
+            let totalDistance = 0;
+            let minEle = Number.POSITIVE_INFINITY;
+            let maxEle = Number.NEGATIVE_INFINITY;
+            const pointsWithGradient = [{ ...gpxPoints[0], dist: 0, gradient: 0 }];
+
+            minEle = Math.min(minEle, gpxPoints[0].ele || 0);
+            maxEle = Math.max(maxEle, gpxPoints[0].ele || 0);
+
+            for (let i = 1; i < gpxPoints.length; i++) {
+                const prev = pointsWithGradient[i - 1];
+                const curr = gpxPoints[i];
+
+                const R = 6371000;
+                const dLat = (curr.lat - prev.lat) * Math.PI / 180;
+                const dLon = (curr.lon - prev.lon) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.cos(prev.lat * Math.PI / 180) * Math.cos(curr.lat * Math.PI / 180) *
+                         Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const segDist = R * c;
+
+                totalDistance += segDist;
+
+                const elevDiff = (curr.ele || 0) - (prev.ele || 0);
+                const gradient = segDist > 0 ? (elevDiff / segDist) * 100 : 0;
+
+                minEle = Math.min(minEle, curr.ele || 0);
+                maxEle = Math.max(maxEle, curr.ele || 0);
+
+                pointsWithGradient.push({
+                    ...curr,
+                    dist: totalDistance,
+                    gradient: gradient
+                });
+            }
+
+            const gradients = pointsWithGradient.map(p => p.gradient);
+            const smoothedGradients = smoothGradient(gradients, 6);
+            pointsWithGradient.forEach((p, idx) => {
+                p.gradientSmooth = smoothedGradients[idx] ?? p.gradient;
+            });
+
+            return {
+                points: pointsWithGradient,
+                minEle,
+                maxEle,
+            };
+        }
+
+        function buildElevationChart(zoomDomain = null) {
+            const routeData = currentRouteData;
+            const pts = routeData ? routeData.points : null;
+            if (!pts || pts.length < 2) return;
+
+            const container = document.getElementById('elevation');
+            container.innerHTML = '';
+
+            if (hoverMapMarker) { map.removeLayer(hoverMapMarker); hoverMapMarker = null; }
+            if (zoomStartMarker) { map.removeLayer(zoomStartMarker); zoomStartMarker = null; }
+            if (zoomEndMarker) { map.removeLayer(zoomEndMarker); zoomEndMarker = null; }
+
+            const totalW = 900;
+            const totalH = 290;
+            const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+            const W = totalW - margin.left - margin.right;
+            const H = totalH - margin.top - margin.bottom;
+
+            const fullData = pts.map(p => ({ dist: p.dist / 1000, ele: p.ele }));
+            const fullMaxDist = d3.max(fullData, d => d.dist);
+            const isZoomed = !!zoomDomain;
+
+            const [d0, d1] = zoomDomain || [0, fullMaxDist];
+            currentZoomDomain = zoomDomain || null;
+            updateSectionInfo();
+
+            const data = fullData.filter(d => d.dist >= d0 && d.dist <= d1);
+            if (data.length < 2) return;
+
+            const rawG = [0];
+            for (let i = 1; i < pts.length; i++) {
+                const dDist = pts[i].dist - pts[i - 1].dist;
+                const dEle = pts[i].ele - pts[i - 1].ele;
+                rawG.push(dDist > 0 ? (dEle / dDist) * 100 : 0);
+            }
+            const smG = smoothGradient(rawG, 6);
+
+            const xScale = d3.scaleLinear().domain([d0, d1]).range([0, W]);
+
+            const elevations = data.map(d => d.ele);
+            const minEle = Math.min(...elevations);
+            const maxEle = Math.max(...elevations);
+            const elevationGain = maxEle - minEle;
+
+            const paddingTop = 300;
+            const paddingBottom = minEle >= 100 ? 80 : Math.max(0, minEle * 0.5);
+            const rangeYBase = Math.max(elevationGain * 1.5, elevationGain + 300);
+            const rangeYFinal = rangeYBase + paddingBottom + paddingTop;
+
+            const roundTo = 50;
+            const yMin = Math.floor((minEle - paddingBottom) / roundTo) * roundTo;
+            const yMaxRaw = Math.ceil((yMin + rangeYFinal) / roundTo) * roundTo;
+            const yMaxCap = Math.ceil((maxEle + paddingTop) / roundTo) * roundTo;
+            const yMax = Math.min(yMaxRaw, yMaxCap);
+
+            const yScale = d3.scaleLinear().domain([yMin, yMax]).range([H, 0]);
+
+            const svg = d3.select(container).append('svg')
+                .attr('viewBox', `0 0 ${totalW} ${totalH}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('width', '100%')
+                .style('height', 'auto')
+                .style('display', 'block')
+                .style('vertical-align', 'bottom');
+
+            svg.append('defs').append('clipPath').attr('id', 'elev-clip')
+                .append('rect').attr('width', W).attr('height', H);
+
+            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+            const xAxisG = g.append('g').attr('transform', `translate(0,${H})`);
+            xAxisG.call(d3.axisBottom(xScale).ticks(10).tickFormat(d => d.toFixed(1) + ' km'))
+                .selectAll('text').style('font-size', '11px');
+
+            const yAxisG = g.append('g');
+            yAxisG.call(d3.axisLeft(yScale).ticks(6).tickFormat(d => d + ' m'))
+                .selectAll('text').style('font-size', '11px');
+
+            g.append('text').attr('transform', 'rotate(-90)')
+                .attr('x', -H / 2).attr('y', -48)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '11px').style('fill', '#6b7280').text('m');
+
+            const gridG = g.append('g').attr('class', 'grid');
+            gridG.call(d3.axisLeft(yScale).ticks(6).tickSize(-W).tickFormat(''))
+                .selectAll('line').style('stroke', '#e5e7eb').style('stroke-dasharray', '3,3');
+            gridG.select('.domain').remove();
+
+            const chartG = g.append('g').attr('clip-path', 'url(#elev-clip)');
+
+            const startOrigIdx = fullData.findIndex(d => d.dist >= d0);
+            const endOrigIdx = fullData.findIndex(d => d.dist > d1);
+            const iEnd = endOrigIdx === -1 ? fullData.length : endOrigIdx;
+
+            for (let i = Math.max(1, startOrigIdx); i < iEnd; i++) {
+                const p1 = fullData[i - 1];
+                const p2 = fullData[i];
+                const color = getGradientColor(smG[i]);
+                const path = `M${xScale(p1.dist)},${yScale(p1.ele)} L${xScale(p2.dist)},${yScale(p2.ele)} L${xScale(p2.dist)},${H} L${xScale(p1.dist)},${H} Z`;
+                chartG.append('path').attr('d', path).attr('fill', color).attr('opacity', 0.7).style('pointer-events', 'none');
+                chartG.append('line')
+                    .attr('x1', xScale(p1.dist)).attr('y1', yScale(p1.ele))
+                    .attr('x2', xScale(p2.dist)).attr('y2', yScale(p2.ele))
+                    .attr('stroke', color).attr('stroke-width', 1.5).style('pointer-events', 'none');
+            }
+
+            container.style.position = 'relative';
+            if (isZoomed) {
+                const hint = document.createElement('div');
+                hint.textContent = 'Doppio clic per reset zoom';
+                hint.style.cssText = 'position:absolute;top:6px;right:8px;font-size:10px;color:#9ca3af;font-family:Inter,sans-serif;pointer-events:none;';
+                container.appendChild(hint);
+            }
+
+            let tooltip = document.getElementById('elev-hover-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'elev-hover-tooltip';
+                tooltip.style.cssText = 'position:fixed;pointer-events:none;display:none;background:rgba(15,15,15,0.92);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;font-family:Inter,sans-serif;z-index:99999;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.35);border-left:3px solid #fc5200;';
+                document.body.appendChild(tooltip);
+            }
+            tooltip.style.display = 'none';
+
+            const hoverLine = g.append('line')
+                .attr('y1', 0).attr('y2', H)
+                .attr('stroke', '#555').attr('stroke-width', 1)
+                .attr('stroke-dasharray', '4,3').attr('opacity', 0)
+                .style('pointer-events', 'none');
+
+            const hoverDot = g.append('circle')
+                .attr('r', 5).attr('fill', '#fc5200')
+                .attr('stroke', '#fff').attr('stroke-width', 2)
+                .attr('opacity', 0).style('pointer-events', 'none');
+
+            hoverMapMarker = L.circleMarker([0, 0], {
+                radius: 8, color: '#fc5200', fillColor: '#fc5200',
+                fillOpacity: 0.9, weight: 2, opacity: 0
+            }).addTo(map);
+
+            if (isZoomed) {
+                const startZoomIdx = fullData.findIndex(d => d.dist >= d0);
+                let endZoomIdx = fullData.findIndex(d => d.dist >= d1);
+                if (endZoomIdx === -1) endZoomIdx = fullData.length - 1;
+
+                const spGPS = routeData.points[startZoomIdx];
+                const epGPS = routeData.points[endZoomIdx];
+
+                const zoomIconStart = L.divIcon({
+                    className: '',
+                    html: `<div style="width:12px;height:12px;background:#3b82f6;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`,
+                    iconSize: [12, 12], iconAnchor: [6, 6]
+                });
+                const zoomIconEnd = L.divIcon({
+                    className: '',
+                    html: `<div style="width:12px;height:12px;background:#8b5cf6;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`,
+                    iconSize: [12, 12], iconAnchor: [6, 6]
+                });
+
+                zoomStartMarker = L.marker([spGPS.lat, spGPS.lon], { icon: zoomIconStart }).addTo(map);
+                zoomEndMarker = L.marker([epGPS.lat, epGPS.lon], { icon: zoomIconEnd }).addTo(map);
+            }
+
+            function updateHover(clientX, clientY, svgX) {
+                const dist = xScale.invert(svgX);
+                let lo = 0, hi = fullData.length - 1;
+                while (lo < hi - 1) {
+                    const mid = (lo + hi) >> 1;
+                    if (fullData[mid].dist < dist) lo = mid; else hi = mid;
+                }
+                const ptIdx = Math.abs(fullData[lo].dist - dist) < Math.abs(fullData[hi].dist - dist) ? lo : hi;
+                const pt = fullData[ptIdx];
+                if (pt.dist < d0 || pt.dist > d1) return;
+
+                const cx = xScale(pt.dist), cy = yScale(pt.ele);
+                hoverLine.attr('x1', cx).attr('x2', cx).attr('opacity', 0.7);
+                hoverDot.attr('cx', cx).attr('cy', cy).attr('opacity', 1);
+
+                const grade = smG[ptIdx];
+                const gradeColor = getGradientColor(grade);
+                const gradeSign = grade > 0.05 ? '+' : '';
+                tooltip.innerHTML = '↑ <b>' + pt.ele.toFixed(0) + ' m</b> &nbsp;·&nbsp; ' + pt.dist.toFixed(2) + ' km' +
+                    `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${gradeColor};color:#fff;font-size:11px;font-weight:700;margin-left:6px;">${gradeSign}${grade.toFixed(1)}%</span>`;
+                tooltip.style.display = 'block';
+                let tx = clientX + 16, ty = clientY - 38;
+                if (tx + 200 > window.innerWidth) tx = clientX - 210;
+                if (ty < 0) ty = clientY + 12;
+                tooltip.style.left = tx + 'px';
+                tooltip.style.top = ty + 'px';
+
+                const gp = routeData.points[ptIdx];
+                hoverMapMarker.setLatLng([gp.lat, gp.lon]);
+                hoverMapMarker.setStyle({ opacity: 1, fillOpacity: 0.9 });
+            }
+
+            function clearHover() {
+                hoverLine.attr('opacity', 0);
+                hoverDot.attr('opacity', 0);
+                tooltip.style.display = 'none';
+                if (hoverMapMarker) hoverMapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
+            }
+
+            const selPanel = document.createElement('div');
+            selPanel.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);display:none;background:rgba(15,15,15,0.92);color:#fff;padding:7px 16px;border-radius:8px;font-size:13px;font-family:Inter,sans-serif;z-index:9999;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.35);gap:18px;align-items:center;pointer-events:none;';
+            container.appendChild(selPanel);
+
+            function showSelectionStats(x0, x1) {
+                const selD0 = xScale.invert(Math.min(x0, x1));
+                const selD1 = xScale.invert(Math.max(x0, x1));
+                let i0 = fullData.findIndex(d => d.dist >= selD0);
+                let i1 = fullData.findIndex(d => d.dist >= selD1);
+                if (i0 < 0) i0 = 0;
+                if (i1 < 0) i1 = fullData.length - 1;
+                if (i1 <= i0) return;
+
+                const distKm = selD1 - selD0;
+                let gain = 0, loss = 0;
+                for (let i = i0 + 1; i <= i1; i++) {
+                    const dEle = fullData[i].ele - fullData[i - 1].ele;
+                    if (dEle > 0) gain += dEle; else loss += Math.abs(dEle);
+                }
+                const distM = distKm * 1000;
+                const netEle = fullData[i1].ele - fullData[i0].ele;
+                const avgGrade = distM > 0 ? (netEle / distM) * 100 : 0;
+                const gradeSign = avgGrade > 0 ? '+' : '';
+                const gradeColor = getGradientColor(avgGrade);
+
+                selPanel.style.display = 'flex';
+                selPanel.innerHTML = `
+                    <span>📏 <b>${distKm.toFixed(2)} km</b></span>
+                    <span style="color:#aaa">|</span>
+                    <span>↑ <b style="color:#4ade80">+${gain.toFixed(0)} m</b></span>
+                    <span style="color:#aaa">|</span>
+                    <span>↓ <b style="color:#60a5fa">-${loss.toFixed(0)} m</b></span>
+                    <span style="color:#aaa">|</span>
+                    <span>⛰ <b style="color:${gradeColor}">${gradeSign}${avgGrade.toFixed(1)}%</b> media</span>
+                `;
+
+                const label = document.getElementById('sel-label');
+                if (label) label.style.display = 'none';
+                const sd = document.getElementById('sel-dist');
+                const sg = document.getElementById('sel-gain');
+                const sl = document.getElementById('sel-loss');
+                const sgr = document.getElementById('sel-grade');
+                if (sd) { sd.style.display = 'inline'; document.getElementById('sel-dist-val').textContent = distKm.toFixed(2) + ' km'; }
+                if (sg) { sg.style.display = 'inline'; document.getElementById('sel-gain-val').textContent = '+' + gain.toFixed(0) + ' m'; }
+                if (sl) { sl.style.display = 'inline'; document.getElementById('sel-loss-val').textContent = '-' + loss.toFixed(0) + ' m'; }
+                if (sgr) { sgr.style.display = 'inline'; document.getElementById('sel-grade-val').style.color = gradeColor; document.getElementById('sel-grade-val').textContent = gradeSign + avgGrade.toFixed(1) + '%'; }
+            }
+
+            const brushG = g.append('g').attr('class', 'brush');
+            let isBrushing = false;
+
+            const brush = d3.brushX()
+                .extent([[0, 0], [W, H]])
+                .on('start', () => { isBrushing = true; tooltip.style.display = 'none'; })
+                .on('brush', (event) => {
+                    if (!event.selection) return;
+                    showSelectionStats(event.selection[0], event.selection[1]);
+                })
+                .on('end', (event) => {
+                    isBrushing = false;
+                    selPanel.style.display = 'none';
+                    if (!event.selection) return;
+                    const [x0, x1] = event.selection;
+                    const newD0 = xScale.invert(x0);
+                    const newD1 = xScale.invert(x1);
+                    brushG.call(brush.move, null);
+                    if (newD1 - newD0 > 0.1) buildElevationChart([newD0, newD1]);
+                });
+
+            brushG.call(brush);
+            brushG.select('.selection')
+                .style('fill', 'rgba(252,82,0,0.15)')
+                .style('stroke', '#fc5200')
+                .style('stroke-width', '1px');
+
+            brushG.on('dblclick', () => buildElevationChart(null));
+
+            brushG.on('mousemove', function(event) {
+                if (isBrushing) return;
+                const [mx] = d3.pointer(event, g.node());
+                updateHover(event.clientX, event.clientY, mx);
+            }).on('mouseleave', () => clearHover());
+        }
+        
+        function getGradientColor(gradient) {
+            const g = Math.max(-20, Math.min(20, gradient));
+            
+            if (g < -15) {
+                const t = (g + 20) / 5;
+                return interpolateColor('#0f172a', '#1e3a8a', t);
+            } else if (g < -10) {
+                const t = (g + 15) / 5;
+                return interpolateColor('#1e3a8a', '#3b82f6', t);
+            } else if (g < -5) {
+                const t = (g + 10) / 5;
+                return interpolateColor('#3b82f6', '#60a5fa', t);
+            } else if (g < 0) {
+                const t = (g + 5) / 5;
+                return interpolateColor('#60a5fa', '#22c55e', t);
+            } else if (g < 5) {
+                const t = g / 5;
+                return interpolateColor('#22c55e', '#fbbf24', t);
+            } else if (g < 8) {
+                const t = (g - 5) / 3;
+                return interpolateColor('#fbbf24', '#f97316', t);
+            } else if (g < 11) {
+                const t = (g - 8) / 3;
+                return interpolateColor('#f97316', '#dc2626', t);
+            } else if (g < 15) {
+                const t = (g - 11) / 4;
+                return interpolateColor('#dc2626', '#991b1b', t);
+            } else {
+                const t = (g - 15) / 5;
+                return interpolateColor('#991b1b', '#450a0a', t);
+            }
+        }
+        
+        function interpolateColor(color1, color2, t) {
+            const c1 = hexToRgb(color1);
+            const c2 = hexToRgb(color2);
+            
+            const r = Math.round(c1.r + (c2.r - c1.r) * t);
+            const g = Math.round(c1.g + (c2.g - c1.g) * t);
+            const b = Math.round(c1.b + (c2.b - c1.b) * t);
+            
+            return rgbToHex(r, g, b);
+        }
+        
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+        
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+        }
+        
+        function smoothGradient(gradients, windowSize = 6) {
+            const smoothed = [];
+            for (let i = 0; i < gradients.length; i++) {
+                let sum = 0;
+                let count = 0;
+                const start = Math.max(0, i - windowSize);
+                const end = Math.min(gradients.length - 1, i + windowSize);
+                
+                for (let j = start; j <= end; j++) {
+                    sum += gradients[j];
+                    count++;
+                }
+                smoothed.push(sum / count);
+            }
+            return smoothed;
+        }
+        
+        function buildGradientLegend() {
+            const legend = document.getElementById('legendContainer');
+            if (!legend) return;
+            
+            const ranges = [
+                { label: '↓ -15%+', color: getGradientColor(-17.5) },
+                { label: '-15 a -10%', color: getGradientColor(-12.5) },
+                { label: '-10 a -5%', color: getGradientColor(-7.5) },
+                { label: '-5 a 0%', color: getGradientColor(-2.5) },
+                { label: '0 a +5%', color: getGradientColor(2.5) },
+                { label: '+5 a +8%', color: getGradientColor(6.5) },
+                { label: '+8 a +11%', color: getGradientColor(9.5) },
+                { label: '+11 a +15%', color: getGradientColor(13) },
+                { label: '+15%+', color: getGradientColor(17.5) }
+            ];
+            
+            legend.innerHTML = ranges.map(r => 
+                `<div class="legend-item">
+                    <div class="legend-color" style="background:${r.color}"></div>
+                    <span>${r.label}</span>
+                </div>`
+            ).join('');
+        }
+        
+        function updateMap(gpxPoints, preserveView = true) {
+            initMap();
+            
+            if (!gpxPoints || gpxPoints.length === 0) return;
+            const previousCenter = map.getCenter();
+            const previousZoom = map.getZoom();
+
+            const routeData = computeRouteData(gpxPoints);
+            if (!routeData) return;
+            const pointsWithGradient = routeData.points;
+            currentRouteData = routeData;
+
+            if (!routeLayerGroup) {
+                routeLayerGroup = L.layerGroup().addTo(map);
+            }
+            routeLayerGroup.clearLayers();
+            
+            // Disegna polyline segmento per segmento con colori
+            for (let i = 1; i < pointsWithGradient.length; i++) {
+                const p1 = pointsWithGradient[i-1];
+                const p2 = pointsWithGradient[i];
+                const color = getGradientColor(p2.gradientSmooth || 0);
+                
+                L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.9
+                }).addTo(routeLayerGroup);
+            }
+            
+            // Aggiungi marker start/end
+            const startIcon = L.divIcon({
+                className: '',
+                html: `<div style="width:14px;height:14px;background:#22c55e;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7]
+            });
+            const endIcon = L.divIcon({
+                className: '',
+                html: `<div style="font-size:20px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))">🏁</div>`,
+                iconSize: [20, 20],
+                iconAnchor: [4, 20]
+            });
+
+            L.marker([gpxPoints[0].lat, gpxPoints[0].lon], { icon: startIcon })
+                .addTo(routeLayerGroup)
+                .bindPopup(`<b>🚦 Partenza</b><br>Quota: ${Math.round(gpxPoints[0].ele || 0)} m`);
+
+            L.marker([gpxPoints[gpxPoints.length-1].lat, gpxPoints[gpxPoints.length-1].lon], { icon: endIcon })
+                .addTo(routeLayerGroup)
+                .bindPopup(`<b>🏁 Arrivo</b><br>Quota: ${Math.round(gpxPoints[gpxPoints.length-1].ele || 0)} m`);
+            
+            // Preserva zoom/pan quando aggiorni smoothing
+            const latlngs = gpxPoints.map(p => [p.lat, p.lon]);
+            const bounds = L.latLngBounds(latlngs);
+
+            if (!hasInitialFit || !preserveView) {
+                map.fitBounds(bounds, { padding: [30, 30] });
+                hasInitialFit = true;
+            } else {
+                map.setView(previousCenter, previousZoom, { animate: false });
+            }
+
+            buildElevationChart(currentZoomDomain);
+            
+            // Mostra legenda
+            buildGradientLegend();
+        }
+        
+        function updateStats(distanza, dislivello, numPoints) {
+            document.getElementById('statKm').textContent = distanza !== null ? distanza.toFixed(1) : '—';
+            document.getElementById('statElev').textContent = dislivello !== null ? dislivello : '—';
+            document.getElementById('statPoints').textContent = numPoints || '—';
+        }
+        
+        // ── EVENT HANDLERS ───────────────────────────────────────────────────────
+        
+        // Upload
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        // Evita apertura file nel browser quando trascini fuori dalla dropzone.
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => e.preventDefault());
+        
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('active');
+        });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('active'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('active');
+            loadFile(e.dataTransfer.files[0]);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                loadFile(e.target.files[0]);
+            }
+        });
+        
+        function loadFile(file) {
+            if (!file.name.endsWith('.gpx')) {
+                showMessage('Solo file GPX sono supportati', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            document.getElementById('uploadStatus').innerHTML = '<span class="spinner"></span>Caricamento...';
+            
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Errore: ' + data.error, 'error');
+                    document.getElementById('uploadStatus').textContent = '';
+                    return;
+                }
+                
+                currentSessionId = data.session_id;
+                currentGpxPoints = data.gpx_points;
+                baseGpxPoints = clonePoints(data.gpx_points);
+                currentZoomDomain = null;
+                
+                // Mostra controls
+                document.getElementById('controlsPanel').style.display = 'block';
+                
+                // Aggiorna UI
+                document.getElementById('distanzaEdit').value = data.distanza_km;
+                document.getElementById('dislivelloEdit').value = data.dislivello_m;
+                document.getElementById('smoothSlider').value = '0';
+                document.getElementById('smoothValue').textContent = '0';
+                
+                updateMap(data.gpx_points, false);
+                updateStats(data.distanza_km, data.dislivello_m, data.gpx_points.length);
+                
+                showMessage(`Caricato: ${data.filename} (${data.gpx_points.length} punti)`, 'success');
+                document.getElementById('uploadStatus').textContent = '✓ Caricato';
+            })
+            .catch(e => {
+                showMessage('Errore di upload: ' + e, 'error');
+                document.getElementById('uploadStatus').textContent = '';
+            });
+        }
+        
+        // Smoothing slider
+        document.getElementById('smoothSlider').addEventListener('input', (e) => {
+            const window = e.target.value;
+            document.getElementById('smoothValue').textContent = window;
+            
+            if (!currentSessionId) return;
+
+            applyGlobalSmoothingFromBase(window);
+            const distanzaNow = parseFloat(document.getElementById('distanzaEdit').value) || 0;
+            const dislivelloNow = calculateElevationGain(currentGpxPoints);
+            document.getElementById('dislivelloEdit').value = dislivelloNow;
+            updateMap(currentGpxPoints, true);
+            updateStats(distanzaNow, dislivelloNow, currentGpxPoints.length);
+        });
+
+        function calculateElevationGain(points) {
+            if (!points || points.length < 2) return 0;
+            let gain = 0;
+            for (let i = 1; i < points.length; i++) {
+                const diff = (points[i].ele || 0) - (points[i - 1].ele || 0);
+                if (diff > 0) gain += diff;
+            }
+            return Math.round(gain);
+        }
+
+        function applySectionSmoothing() {
+            if (!baseGpxPoints || !currentZoomDomain) {
+                showMessage('Seleziona prima una sezione nell\'altimetria', 'error');
+                return;
+            }
+
+            const win = parseInt(document.getElementById('smoothSlider').value, 10);
+            if (win <= 1) {
+                showMessage('Con smoothing 0 o 1 non ci sono modifiche da applicare', 'info');
+                return;
+            }
+            const half = Math.floor(win / 2);
+            const routeData = computeRouteData(baseGpxPoints);
+            const firstKm = currentZoomDomain[0];
+            const lastKm = currentZoomDomain[1];
+
+            const idxs = [];
+            for (let i = 0; i < routeData.points.length; i++) {
+                const km = (routeData.points[i].dist || 0) / 1000;
+                if (km >= firstKm && km <= lastKm) idxs.push(i);
+            }
+
+            if (idxs.length < 3) {
+                showMessage('Sezione troppo corta per smoothing locale', 'error');
+                return;
+            }
+
+            const iMin = idxs[0];
+            const iMax = idxs[idxs.length - 1];
+            const src = baseGpxPoints.map(p => p.ele || 0);
+            const dst = src.slice();
+
+            for (let i = iMin; i <= iMax; i++) {
+                const start = Math.max(iMin, i - half);
+                const end = Math.min(iMax, i + half);
+                let sum = 0;
+                let count = 0;
+                for (let j = start; j <= end; j++) {
+                    sum += src[j];
+                    count += 1;
+                }
+                dst[i] = sum / count;
+            }
+
+            baseGpxPoints = baseGpxPoints.map((p, i) => ({ ...p, ele: Math.round(dst[i] * 10) / 10 }));
+
+            // Mantieni il valore slider corrente ma rigenera dalla baseline modificata.
+            const currentWin = parseInt(document.getElementById('smoothSlider').value, 10) || 0;
+            applyGlobalSmoothingFromBase(currentWin);
+
+            const newGain = calculateElevationGain(currentGpxPoints);
+            document.getElementById('dislivelloEdit').value = newGain;
+
+            updateMap(currentGpxPoints, true);
+            const distanzaNow = parseFloat(document.getElementById('distanzaEdit').value) || 0;
+            updateStats(distanzaNow, newGain, currentGpxPoints.length);
+            showMessage('Smoothing applicato e salvato sulla sezione corrente', 'success');
+        }
+
+        document.getElementById('smoothSectionBtn').addEventListener('click', applySectionSmoothing);
+        document.getElementById('resetZoomBtn').addEventListener('click', () => {
+            buildElevationChart(null);
+        });
+        
+        // Export
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!currentSessionId) return;
+            
+            const data = {
+                distanza_km: parseFloat(document.getElementById('distanzaEdit').value),
+                dislivello_m: parseInt(document.getElementById('dislivelloEdit').value),
+                gpx_points: currentGpxPoints
+            };
+            
+            fetch(`/api/export-gpx/${currentSessionId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => {
+                if (!r.ok) {
+                    return r.json().then(err => { throw new Error(err.error || 'Errore export GPX'); });
+                }
+                return r.blob();
+            })
+            .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'route-edited.gpx';
+                a.click();
+                URL.revokeObjectURL(url);
+                showMessage('Esportato GPX', 'success');
+            })
+            .catch(e => {
+                showMessage('Errore export: ' + e.message, 'error');
+            });
+        });
+        
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            if (!currentSessionId) return;
+            
+            const data = {
+                distanza_km: parseFloat(document.getElementById('distanzaEdit').value),
+                dislivello_m: parseInt(document.getElementById('dislivelloEdit').value),
+                gpx_points: currentGpxPoints
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            navigator.clipboard.writeText(json).then(() => {
+                showMessage('Dati copiati negli appunti!', 'success');
+            });
+        });
+    </script>
+</body>
+</html>
