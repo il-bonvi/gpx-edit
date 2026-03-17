@@ -1,6 +1,7 @@
 # File temporanei GPX
 temp_gpx/
 *.gpx
+*.bat
 
 # File Python
 __pycache__/
