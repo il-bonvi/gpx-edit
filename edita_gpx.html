@@ -505,6 +505,13 @@
                                 <span id="sel-grade" style="display:none">⛰ <strong id="sel-grade-val">--</strong> media</span>
                             </div>
                         </div>
+                        <div style="display:flex;align-items:center;gap:10px;padding:6px 0 2px;font-size:0.8rem;color:#6b7280;">
+                            <span>Smoothing pendenza:</span>
+                            <input type="range" id="smoothing-slider" min="0" max="12" value="3" step="1"
+                                style="width:110px;accent-color:#fc5200;"
+                                oninput="updateSmoothing(this.value)">
+                            <span id="smoothing-label" style="min-width:52px;">3 pt</span>
+                        </div>
                     </div>
                 </div>
                 
@@ -539,6 +546,32 @@
         let hoverMapMarker = null;
         let zoomStartMarker = null;
         let zoomEndMarker = null;
+        let _smoothingWindow = 3;
+
+        function updateSmoothing(val) {
+            _smoothingWindow = parseInt(val);
+            const label = document.getElementById('smoothing-label');
+            label.textContent = val + ' pt';
+            if (currentRouteData) {
+                redrawPolyline();
+                buildElevationChart(currentZoomDomain);
+            }
+        }
+
+        function redrawPolyline() {
+            if (!routeLayerGroup || !currentRouteData) return;
+            routeLayerGroup.clearLayers();
+            const pts = currentRouteData.points;
+            const gradients = pts.map(p => p.gradient);
+            const smoothed = smoothGradient(gradients, _smoothingWindow);
+            for (let i = 1; i < pts.length; i++) {
+                const p1 = pts[i-1], p2 = pts[i];
+                const color = getGradientColor(smoothed[i] ?? 0);
+                L.polyline([[p1.lat, p1.lon],[p2.lat, p2.lon]], {
+                    color, weight: 4, opacity: 0.9
+                }).addTo(routeLayerGroup);
+            }
+        }
         
         // ── UTILITY ──────────────────────────────────────────────────────────────
         
@@ -690,7 +723,7 @@
                 const dEle = pts[i].ele - pts[i - 1].ele;
                 rawG.push(dDist > 0 ? (dEle / dDist) * 100 : 0);
             }
-            const smG = smoothGradient(rawG, 6);
+            const smG = smoothGradient(rawG, _smoothingWindow);
 
             const xScale = d3.scaleLinear().domain([d0, d1]).range([0, W]);
 
@@ -1056,17 +1089,7 @@
             routeLayerGroup.clearLayers();
             
             // Disegna polyline segmento per segmento con colori
-            for (let i = 1; i < pointsWithGradient.length; i++) {
-                const p1 = pointsWithGradient[i-1];
-                const p2 = pointsWithGradient[i];
-                const color = getGradientColor(p2.gradientSmooth || 0);
-                
-                L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
-                    color: color,
-                    weight: 4,
-                    opacity: 0.9
-                }).addTo(routeLayerGroup);
-            }
+            redrawPolyline();
             
             // Aggiungi marker start/end
             const startIcon = L.divIcon({
