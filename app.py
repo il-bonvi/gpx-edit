@@ -35,12 +35,12 @@ UPLOAD_FOLDER.mkdir(exist_ok=True)
 
 # ── UTILITY FUNCTIONS ─────────────────────────────────────────────────────────
 
-def parse_gpx(gpx_path: Path, smoothing_window: int = 0) -> dict:
+def parse_gpx(gpx_path: Path) -> dict:
     """Estrae distanza (km), dislivello positivo (m) e punti GPX dal file GPX.
-    
-    Args:
-        gpx_path: Path al file GPX
-        smoothing_window: Finestra di smoothing per le quote (default 0 = GPX originale)
+
+    Nessuno smoothing lato server: viene applicato interamente lato client
+    in edita_gpx.html (smoothElevations / smoothByDistance), quindi qui i
+    dati restano quelli originali del GPX.
     """
     try:
         tree = ET.parse(gpx_path)
@@ -89,29 +89,18 @@ def parse_gpx(gpx_path: Path, smoothing_window: int = 0) -> dict:
             for i in range(len(coords)-1)
         )
 
-        # Smoothing quote: preserva la lunghezza completa dei punti.
+        # Quote originali del GPX, senza smoothing (lo smoothing è client-side).
         # Se un punto non ha elevazione, propaga l'ultimo valore valido.
-        ele_series = []
+        eles = []
         last_ele = None
         for _, _, ele in coords:
             if ele is not None:
                 last_ele = ele
-                ele_series.append(ele)
+                eles.append(ele)
             else:
-                ele_series.append(last_ele if last_ele is not None else 0.0)
+                eles.append(last_ele if last_ele is not None else 0.0)
 
-        w = max(0, int(smoothing_window))
-        if w <= 1:
-            eles = ele_series[:]  # base GPX senza smoothing
-        else:
-            eles = []
-            for i in range(len(ele_series)):
-                start = max(0, i - w // 2)
-                end = min(len(ele_series), i + w // 2 + 1)
-                window_vals = ele_series[start:end]
-                eles.append(sum(window_vals) / len(window_vals))
-
-        # Applica la quota smussata ai punti restituiti al frontend.
+        # Applica le quote (originali) ai punti restituiti al frontend.
         for i, p in enumerate(gpx_points):
             p['ele'] = round(eles[i], 1)
 
@@ -213,7 +202,7 @@ def upload():
         file.save(str(filepath))
 
         # Parsa il GPX
-        gpx_data = parse_gpx(filepath, smoothing_window=0)
+        gpx_data = parse_gpx(filepath)
 
         if gpx_data.get('error'):
             return jsonify({'error': gpx_data['error']}), 400
@@ -221,11 +210,10 @@ def upload():
         if not gpx_data.get('gpx_points'):
             return jsonify({'error': 'File GPX non valido'}), 400
 
-        # Salva in cache
+        # Salva in cache (solo ciò che serve davvero: export-gpx usa filepath/filename)
         gpx_cache[session_id] = {
             'filepath': str(filepath),
             'filename': filename,
-            'data': gpx_data
         }
 
         # Reverse geocoding
@@ -241,52 +229,6 @@ def upload():
             'gpx_points': gpx_data.get('gpx_points'),
             'luogo': luogo,
         })
-
-    except Exception as e:
-        return jsonify({'error': f'Errore: {str(e)}'}), 500
-
-
-@app.route('/api/smooth/<session_id>/<int:window>', methods=['GET'])
-def smooth(session_id, window):
-    """Ricalcola i dati con diverso livello di smoothing"""
-    try:
-        if session_id not in gpx_cache:
-            return jsonify({'error': 'Sessione non trovata'}), 404
-
-        filepath = gpx_cache[session_id]['filepath']
-        gpx_data = parse_gpx(Path(filepath), smoothing_window=window)
-
-        if gpx_data.get('error'):
-            return jsonify({'error': gpx_data['error']}), 400
-
-        return jsonify({
-            'distanza_km': gpx_data.get('distanza_km'),
-            'dislivello_m': gpx_data.get('dislivello_m'),
-            'gpx_points': gpx_data.get('gpx_points'),
-        })
-
-    except Exception as e:
-        return jsonify({'error': f'Errore: {str(e)}'}), 500
-
-
-@app.route('/api/export/<session_id>', methods=['POST'])
-def export_data(session_id):
-    """Esporta i dati finali"""
-    try:
-        if session_id not in gpx_cache:
-            return jsonify({'error': 'Sessione non trovata'}), 404
-
-        data = request.get_json()
-        
-        filename = gpx_cache[session_id]['filename']
-        export = {
-            'slug': Path(filename).stem,
-            'distanza_km': data.get('distanza_km'),
-            'dislivello_m': data.get('dislivello_m'),
-            'gpx_points': data.get('gpx_points'),
-        }
-
-        return jsonify(export)
 
     except Exception as e:
         return jsonify({'error': f'Errore: {str(e)}'}), 500
